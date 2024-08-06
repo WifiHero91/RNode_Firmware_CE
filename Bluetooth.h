@@ -20,10 +20,8 @@
     #include "esp_bt_device.h"
     BluetoothSerial SerialBT;
   #elif HAS_BLE == true
-    #include "esp_bt_main.h"
-    #include "esp_bt_device.h"
-    // TODO: Remove
-    #define SerialBT Serial
+    //#include "src/bluetooth/BLE.h"
+    BLESerial SerialBT;
   #endif
 
 #elif MCU_VARIANT == MCU_NRF52
@@ -156,89 +154,55 @@ char bt_devname[11];
     }
 
   #elif HAS_BLE == true
-    void bt_stop() {
-      if (bt_state != BT_STATE_OFF) {
-        bt_allow_pairing = false;
-        bt_state = BT_STATE_OFF;
-      }
+// Many of the functions in this section are stubs. The actual functions can be found in src/bluetooth/BLE.cpp
+
+void bt_stop() {
+  if (bt_state != BT_STATE_OFF) {
+    bt_allow_pairing = false;
+    bt_state = BT_STATE_OFF;
+    SerialBT.stop();
+  }
+}
+
+void bt_disable_pairing() {
+  bt_allow_pairing = false;
+  bt_ssp_pin = 0;
+  bt_state = BT_STATE_ON;
+}
+
+bool bt_setup_hw() {
+    return SerialBT.bt_setup_hw();
+}
+
+void bt_start() {
+  if (bt_state == BT_STATE_OFF) {
+    bt_state = BT_STATE_ON;
+    SerialBT.bt_start();
+  }
+}
+
+bool bt_init() {
+    bt_state = BT_STATE_OFF;
+    if (bt_setup_hw()) {
+      if (bt_enabled && !console_active) bt_start();
+      return true;
+    } else {
+      return false;
     }
+}
 
-    void bt_disable_pairing() {
-      bt_allow_pairing = false;
-      bt_ssp_pin = 0;
-      bt_state = BT_STATE_ON;
-    }
+void bt_enable_pairing() {
+  if (bt_state == BT_STATE_OFF) bt_start();
+  bt_allow_pairing = true;
+  bt_pairing_started = millis();
+  bt_state = BT_STATE_PAIRING;
+}
 
-    void bt_connect_callback(uint16_t conn_handle) {
-      bt_state = BT_STATE_CONNECTED;
-      cable_state = CABLE_STATE_DISCONNECTED;
-    }
-
-    void bt_disconnect_callback(uint16_t conn_handle, uint8_t reason) {
-      bt_state = BT_STATE_ON;
-    }
-
-    bool bt_setup_hw() {
-      if (!bt_ready) {
-        if (EEPROM.read(eeprom_addr(ADDR_CONF_BT)) == BT_ENABLE_BYTE) {
-          bt_enabled = true;
-        } else {
-          bt_enabled = false;
-        }
-        if (btStart()) {
-          if (esp_bluedroid_init() == ESP_OK) {
-            if (esp_bluedroid_enable() == ESP_OK) {
-              const uint8_t* bda_ptr = esp_bt_dev_get_address();
-              char *data = (char*)malloc(BT_DEV_ADDR_LEN+1);
-              for (int i = 0; i < BT_DEV_ADDR_LEN; i++) {
-                  data[i] = bda_ptr[i];
-              }
-              data[BT_DEV_ADDR_LEN] = EEPROM.read(eeprom_addr(ADDR_SIGNATURE));
-              unsigned char *hash = MD5::make_hash(data, BT_DEV_ADDR_LEN);
-              memcpy(bt_dh, hash, BT_DEV_HASH_LEN);
-              sprintf(bt_devname, "RNode %02X%02X", bt_dh[14], bt_dh[15]);
-              free(data);
-
-              // TODO: Implement GAP & GATT for RNode comms over BLE
-              
-              bt_ready = true;
-              return true;
-
-            } else { return false; }
-          } else { return false; }
-        } else { return false; }
-      } else { return false; }
-    }
-
-    void bt_start() {
-      if (bt_state == BT_STATE_OFF) {
-        bt_state = BT_STATE_ON;
-        // TODO: Implement
-      }
-    }
-
-    bool bt_init() {
-        bt_state = BT_STATE_OFF;
-        if (bt_setup_hw()) {
-          if (bt_enabled && !console_active) bt_start();
-          return true;
-        } else {
-          return false;
-        }
-    }
-
-    void bt_enable_pairing() {
-      if (bt_state == BT_STATE_OFF) bt_start();
-      bt_allow_pairing = true;
-      bt_pairing_started = millis();
-      bt_state = BT_STATE_PAIRING;
-    }
-
-    void update_bt() {
-      if (bt_allow_pairing && millis()-bt_pairing_started >= BT_PAIRING_TIMEOUT) {
-        bt_disable_pairing();
-      }
-    }
+void update_bt() {
+  if (bt_allow_pairing && millis()-bt_pairing_started >= BT_PAIRING_TIMEOUT) {
+    bt_disable_pairing();
+  }
+}
   #endif
 
 #elif MCU_VARIANT == MCU_NRF52
