@@ -1376,7 +1376,7 @@ void sx127x::setTxPower(int level, int outputPin) {
   }
 }
 
-uint8_t sx127x::getTxPower() { byte txp = readRegister(REG_PA_CONFIG_7X); return txp; }
+uint8_t sx127x::getTxPower() { uint8_t txp = readRegister(REG_PA_CONFIG_7X); return (txp & 0xF0); }
 
 void sx127x::setFrequency(uint32_t frequency) {
   _frequency = frequency;
